@@ -11,6 +11,7 @@ const cors = require('cors');
 // Import routes
 const uploadRoutes = require('./routes/uploadRoutes');
 const authRoutes = require('./routes/authRoutes');
+const statsRoutes = require('./routes/statsRoutes');
 
 // Initialize express app
 const app = express();
@@ -62,6 +63,7 @@ app.get('/', (req, res) => {
 // API routes
 app.use('/api', uploadRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api', statsRoutes);
 
 // ==========================================
 // ERROR HANDLING
