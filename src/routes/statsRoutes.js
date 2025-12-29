@@ -8,17 +8,19 @@
 const express = require('express');
 const router = express.Router();
 const { google } = require('googleapis');
+const path = require('path');
+
+// Path to credentials file
+const CREDENTIALS_PATH = path.join(__dirname, '../config/google-credentials.json');
 
 // Initialize Google Drive
-const auth = new google.auth.GoogleAuth({
-    credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    },
-    scopes: ['https://www.googleapis.com/auth/drive'],
-});
-
-const drive = google.drive({ version: 'v3', auth });
+async function getDrive() {
+    const auth = new google.auth.GoogleAuth({
+        keyFile: CREDENTIALS_PATH,
+        scopes: ['https://www.googleapis.com/auth/drive'],
+    });
+    return google.drive({ version: 'v3', auth });
+}
 
 // Stats folder ID (we'll use MyAppStorage)
 const STATS_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '1qBOdBEk60VTBpHfEGNX3BeLNFrnfF9ur';
@@ -27,6 +29,8 @@ const STATS_FILE_NAME = 'video_stats.json';
 // Helper: Get or create stats file
 async function getStatsFile() {
     try {
+        const drive = await getDrive();
+
         // Search for existing stats file
         const response = await drive.files.list({
             q: `name='${STATS_FILE_NAME}' and '${STATS_FOLDER_ID}' in parents and trashed=false`,
@@ -40,7 +44,7 @@ async function getStatsFile() {
                 fileId,
                 alt: 'media',
             });
-            return { fileId, data: content.data };
+            return { fileId, data: content.data, drive };
         }
 
         // Create new stats file
@@ -61,7 +65,7 @@ async function getStatsFile() {
             fields: 'id',
         });
 
-        return { fileId: file.data.id, data: { videos: {}, subscribers: {} } };
+        return { fileId: file.data.id, data: { videos: {}, subscribers: {} }, drive };
     } catch (error) {
         console.error('Error getting stats file:', error);
         throw error;
@@ -69,7 +73,7 @@ async function getStatsFile() {
 }
 
 // Helper: Update stats file
-async function updateStatsFile(fileId, data) {
+async function updateStatsFile(drive, fileId, data) {
     try {
         await drive.files.update({
             fileId,
@@ -111,7 +115,7 @@ router.get('/stats/:videoId', async (req, res) => {
 router.post('/stats/:videoId/view', async (req, res) => {
     try {
         const { videoId } = req.params;
-        const { fileId, data } = await getStatsFile();
+        const { fileId, data, drive } = await getStatsFile();
 
         if (!data.videos) data.videos = {};
         if (!data.videos[videoId]) {
@@ -119,7 +123,7 @@ router.post('/stats/:videoId/view', async (req, res) => {
         }
 
         data.videos[videoId].views += 1;
-        await updateStatsFile(fileId, data);
+        await updateStatsFile(drive, fileId, data);
 
         res.json({
             success: true,
@@ -136,7 +140,7 @@ router.post('/stats/:videoId/like', async (req, res) => {
     try {
         const { videoId } = req.params;
         const { userId, action } = req.body; // action: 'add' or 'remove'
-        const { fileId, data } = await getStatsFile();
+        const { fileId, data, drive } = await getStatsFile();
 
         if (!data.videos) data.videos = {};
         if (!data.videos[videoId]) {
@@ -160,7 +164,7 @@ router.post('/stats/:videoId/like', async (req, res) => {
             video.likes = video.likedBy.length;
         }
 
-        await updateStatsFile(fileId, data);
+        await updateStatsFile(drive, fileId, data);
 
         res.json({
             success: true,
@@ -177,7 +181,7 @@ router.post('/stats/:videoId/dislike', async (req, res) => {
     try {
         const { videoId } = req.params;
         const { userId, action } = req.body;
-        const { fileId, data } = await getStatsFile();
+        const { fileId, data, drive } = await getStatsFile();
 
         if (!data.videos) data.videos = {};
         if (!data.videos[videoId]) {
@@ -201,7 +205,7 @@ router.post('/stats/:videoId/dislike', async (req, res) => {
             video.dislikes = video.dislikedBy.length;
         }
 
-        await updateStatsFile(fileId, data);
+        await updateStatsFile(drive, fileId, data);
 
         res.json({
             success: true,
@@ -218,7 +222,7 @@ router.post('/stats/:videoId/comment', async (req, res) => {
     try {
         const { videoId } = req.params;
         const { userId, userName, text, avatar } = req.body;
-        const { fileId, data } = await getStatsFile();
+        const { fileId, data, drive } = await getStatsFile();
 
         if (!data.videos) data.videos = {};
         if (!data.videos[videoId]) {
@@ -236,7 +240,7 @@ router.post('/stats/:videoId/comment', async (req, res) => {
         };
 
         data.videos[videoId].comments.unshift(comment);
-        await updateStatsFile(fileId, data);
+        await updateStatsFile(drive, fileId, data);
 
         res.json({
             success: true,
@@ -252,13 +256,13 @@ router.post('/stats/:videoId/comment', async (req, res) => {
 router.delete('/stats/:videoId/comment/:commentId', async (req, res) => {
     try {
         const { videoId, commentId } = req.params;
-        const { fileId, data } = await getStatsFile();
+        const { fileId, data, drive } = await getStatsFile();
 
         if (data.videos?.[videoId]?.comments) {
             data.videos[videoId].comments = data.videos[videoId].comments.filter(
                 c => c.id !== commentId
             );
-            await updateStatsFile(fileId, data);
+            await updateStatsFile(drive, fileId, data);
         }
 
         res.json({ success: true });
