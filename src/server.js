@@ -10,6 +10,7 @@ const cors = require('cors');
 
 // Import routes
 const uploadRoutes = require('./routes/uploadRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // Initialize express app
 const app = express();
@@ -51,12 +52,16 @@ app.get('/', (req, res) => {
             delete: 'DELETE /api/files/:fileId',
             makePublic: 'POST /api/files/:fileId/public',
             createFolder: 'POST /api/folders',
+            signup: 'POST /api/auth/signup',
+            login: 'POST /api/auth/login',
+            verify: 'GET /api/auth/verify',
         },
     });
 });
 
 // API routes
 app.use('/api', uploadRoutes);
+app.use('/api/auth', authRoutes);
 
 // ==========================================
 // ERROR HANDLING
