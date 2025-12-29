@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Google OAuth credentials (SENSITIVE - never commit!)
+src/config/oauth-credentials.json
+src/config/oauth-token.json
+src/config/google-credentials.json
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
